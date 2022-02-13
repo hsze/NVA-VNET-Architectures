@@ -63,7 +63,7 @@ This is a well documented scenario. Refer to the documentation in [Azure Archite
 
 Below is a simple scenario with a local Spoke VNET peered to both a VHUB and a Classic Hub. The 3rd party NVA is a Cisco CSR. OnPrem is simulated also with CSR terminating via IPSec VPN. 
 
-![Option 2](/Images/Option2-lab.png)
+![Option 2](/Images/Option2-Lab.png)
 
 The VHUB connections are shown as follows, with Association and Propagation to the Default Route Table and Label, or Any to Any. This enables all VNETs (local and remote) to learn of each other. 
 
@@ -93,7 +93,7 @@ SSH validates traffic from SpokeVM to OnPrem.
 
 As explained above, the key to this Option is to ensure the appropriate configuration of Propagation and Association for the Spoke VNETs, OnPrem Branch connection, and DMZ. This ensures Spoke VNETs and Branch do not dymically learn about each other. Static Routes are defined in the respective route tables to ensure traffic hits the DMZ. Below is a simple scenario with a Spoke VNET and DMZ VNET both peered to vHUB, where their Connections are associated with Custom Route Table. The 3rd party NVA is a Cisco CSR. OnPrem is simulated also with CSR terminating via IPSec VPN. 
 
-![Option 3](/Images/Option3-lab.png)
+![Option 3](/Images/Option3-Lab.png)
 
 The Spoke and DMZ VNET Connections' Association and Propagation are shown below:
 
@@ -125,9 +125,9 @@ Similarly, once the Static Routes are defined in the Default Route Table for VNE
 
 ![Option 3 After-RT-Default](/Images/3-After-RT-Default.png)
 
-Validation is complete:
+Traceroute validates OnPrem to VNET is going via NVA (172.22.2.4).
 
-![Option 3 Verify](/Images/2-Verify.png)
+![Option 3 Verify](/Images/3-Validation.png)
 
 
 
