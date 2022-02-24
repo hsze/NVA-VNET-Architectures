@@ -8,7 +8,7 @@ The Hub-Spoke Design with NVA in Hub is well understood and clearly documented i
 
 For VNET to OnPrem traffic, User Defined Routes (UDRs) are required at the Spoke VNETs to ensure traffic is forwarded to the NVA. In order to ensure symmetry for return traffic across stateful firewalls, UDRs are also required at the GatewaySubnet pointing to the NVA (or the ILB front-ending the NVA in an HA configuration) for the Spoke VNET prefix destinations.
 
-The advantage of this option is it is easy to understand. The disadvantage is the roughly n^2 (n-factorial) number of peers which are required to build the full mesh, and possibly hitting the peering [limits](https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/azure-subscription-service-limits#azure-resource-manager-virtual-networking-limits).
+The advantage of this option is it is easy to understand. The disadvantage is the roughly n^2 (n-factorial) number of peers which are required to build the full mesh, and possibly hitting the peering [limits](https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/azure-subscription-service-limits#azure-resource-manager-virtual-networking-limits). [Azure Virtual Network Manager](https://docs.microsoft.com/en-us/azure/virtual-network-manager/overview) may be used as a management service to as a scalable way to manage peering. 
 ## Option 2: Virtual WAN for direct communication between VNETs, and Classic Hub to OnPrem
 With this option, the Spoke VNETs are connected to both a Virtual WAN Hub as well as a Classic Hub hosting a Virtual Network Gateway (VNG). The Virtual WAN connectivity replaces the full mesh from the previous option. Communication to on-prem is facilitated via the Classic Hub. The topology looks as follows:
 
@@ -22,24 +22,24 @@ To reach OnPrem, UDRs are defined at the Spoke VNET subnets for the OnPrem prefi
 
 For return traffic from OnPrem to Spoke, an [Azure Route Server](https://docs.microsoft.com/en-us/azure/route-server/overview) (ARS) in the Classic Hub is required for OnPrem to learn the Spoke prefixes. If the NVA speaks BGP, it can originate a supernet of all the Spokes. This supernet aggregate will be reflected by the ARS to the VNG to OnPrem. This supernet is purely defined and propagated for purposes of ensuring return traffic does not blackhole, especially when the OnPrem connectivity is ExpressRoute. (If it is VPN, it is possible to configure static routing on the CE.) As in previous Option, in order to ensure symmetry for return traffic, UDRs are also required at the GatewaySubnet pointing to the NVA (or the ILB front-ending the NVA in an HA configuration).
 
-The advantage of this option is there is separation of Hub functions: a vHub for a simple VNET-to-VNET any-to-any communication, and a Classic Hub for traffic to OnPrem. Furthermore, this option eliminates the roughly n^2 peering from the previous option. The disadvantage is the introduction of a new function ARS, and the NVA would need to enable BGP to peer with ARS and originate the Spoke supernet.
+The advantage of this option is there is separation of Hub functions: a vHub for simple VNET-to-VNET any-to-any communication, and a Classic Hub for traffic to OnPrem. Furthermore, this option eliminates the roughly n^2 peering from the previous option. The disadvantage is the introduction of a new function ARS, and the NVA would need to have BGP enabled to peer with ARS to originate the Spoke supernet.
 
 ## Option 3: Virtual WAN Custom Route Tables
-In this option, Virtual WAN Custom Route Tables are used as described [here](https://docs.microsoft.com/en-us/azure/virtual-wan/scenario-route-through-nvas-custom#alternate). The vHub has peering Connections built not only to the Spoke VNETs, but it also has peering Connection built to a DMZ VNET. The 3rd party NVA resides in the DMZ VNET. This topology is illustrated as follows:
+In this option, Virtual WAN Custom Route Tables are used, as described [here](https://docs.microsoft.com/en-us/azure/virtual-wan/scenario-route-through-nvas-custom#alternate). The vHub has peering Connections built not only to the Spoke VNETs, but it also has peering Connection built to a DMZ VNET. The 3rd party NVA resides in the DMZ VNET. This topology is illustrated as follows:
 
 ![Option 3](/Images/Option3.png)
 
-In vHub, a “Default” and a “None” route table are predefined. For this option, two additional Route Tables are created: the DMZ Route Table (RT-DMZ) and VNET Route Table (RT-VNET). By configuring appropriate Propagation and Association on the Connections, the VNETs do not learn the OnPrem prefixes directly, but only via defined Static Routes pointing to the DMZ Connection with the NVA (or ILB front-ending NVAs) as Next Hop. Similarly, OnPrem reaches the Spoke VNETs via a defined Static Route pointing to the DMZ Connection with the NVA (or ILB front-ending NVAs) as Next Hop. 
+In vHub, a “Default” and a “None” route table are predefined. For this option, two additional Route Tables are created: the DMZ Route Table (RT-DMZ) and VNET Route Table (RT-VNET). By configuring appropriate Propagation and Association on the Connections, the VNETs do not learn the OnPrem prefixes directly, but only via defined Static Routes pointing to the DMZ Connection with the NVA (or ILB front-ending NVAs) as Next Hop. Similarly, OnPrem reaches the Spoke VNETs via a defined aggregate Static Route pointing to the DMZ Connection with the NVA (or ILB front-ending NVAs) as Next Hop. 
 
 The DMZ, on the other hand, is learning both OnPrem and Spoke VNET prefixes and acts as the bridge between VNET and OnPrem, hence satisfying the requirement of filtering traffic between VNET to OnPrem.
 
-The Association on a Connection may be viewed as what the VNET (Connection) will learn, and Propagation on a Connection may be thought of as what the VNET (Connection) will advertise its existence to. For example, if Spoke-VNET1 Connection is propagating to RT-DMZ Route Table, that means anything associated with RT-DMZ will learn Spoke-VNET1’s prefix. Similarly, if Spoke-VNET1 is associated with RT-VNET, it will learn of the prefixes that are propagating to RT-VNET.
+The Association on a Connection may be viewed as what the VNET (Connection) will learn, and Propagation on a Connection may be thought of as what the VNET (Connection) will advertise its existence to. For example, if Spoke-VNET1 Connection is propagating to RT-DMZ Route Table, that means anything associated with RT-DMZ will learn Spoke-VNET1’s prefix. Similarly, if Spoke-VNET1 is associated with RT-VNET, it will learn of the prefixes of Connections that are propagating to RT-VNET.
 
 The Assocation and Propagation for this Option are defined as follows:
 
 ![Association and Propatation Definitions](/Images/Option3-AssocProp.png)
 
-Note, the VNET-Spoke connections are propagating to RT-DMZ so the DMZ can learn its prefixes. It is also propagating to other Spoke VNETs associated with the same Route Table RT-VNET. This allows a Spoke to be able to communicate with another Spoke without traversing the NVA and free of filtering/inspection. 
+Note, the VNET-Spoke connections are propagating to RT-DMZ so the DMZ can learn its prefixes. It is also propagating to other Spoke VNETs associated with the same Route Table RT-VNET. This allows a Spoke to be able to communicate with another Spoke without traversing the NVA and be free of filtering/inspection. 
 
 Similarly, the Branches are Propagating to Default, meaning all VPN branches Associated with the Default route table, connected to the local vHub or a remote vHub, will be able to communicate with each other without traversing the NVA. The Branches are also Propagating to RT-DMZ, so the DMZ learns of Branches.
 
@@ -47,7 +47,7 @@ Because DMZ Connection is propagating to both RT-VNET and Default, both VNETs an
 
 ![Static Route Defintions](/Images/Option3-StaticRoutes.png)
 
-The advantage of Option 3 are fewer components (e.g. no ARS as in Option 2) and fewer peerings (e.g. Option 1). The disadvantage is multiple route tables need to be maintained on the Virtual Hub, and it is very important to understand the concept of Association and Propagation for this Option to function.  
+The advantage of Option 3 are fewer components (e.g. no ARS as in Option 2) and fewer peerings (e.g. Option 1). The disadvantage is multiple route tables need to be maintained on the Virtual Hub, and it is very important to understand the concept of Association and Propagation for this Option to function. Finally, in the RT-VNET custom routing table, static routes to the specific branch prefixes, versus a supernet, need to be defined (in order to override the vHub adjacency). 
 
 ## Option 4: Virtual WAN with integrated 3rd-Party NVAs (Preview as of February 2022)
 
@@ -127,7 +127,7 @@ Similarly, once the Static Route is defined in the Default Route Table for the V
 
 ![Option 3 After-RT-Default](/Images/3-After-RT-Default.png)
 
-Traceroute validates OnPrem to VNET is going via NVA (172.22.2.4).
+Traceroute validates VNET to OnPrem is going via NVA (172.22.2.4), as well as the reverse OnPrem to VNET is going via NVA (172.22.2.4).
 
 ![Option 3 Verify](/Images/3-Validation.png)
 
